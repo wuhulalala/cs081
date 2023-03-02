@@ -1,16 +1,15 @@
 #include "kernel/types.h"
 #include "kernel/stat.h"
 #include "user/user.h"
-#include <cstring>
-
+#include "kernel/fs.h"
 
 void find(char *path, char *filename) {
-    char buf[512];
+    char buf[512], *p;
     int fd;
     struct stat st;
     struct dirent de;
     if ((fd = open(path, 0)) < 0) {
-        fprintf("find: cannot open %s\n", path);
+        printf("find: cannot open %s\n", path);
         return;
     }
 
@@ -27,14 +26,38 @@ void find(char *path, char *filename) {
     
     case T_DIR:
         if (strlen(path) + 1 + DIRSIZ + 1 > sizeof buf) {
-        printf("ls: path too long\n");
-        break;
+            printf("ls: path too long\n");
+            break;
         }
         strcpy(buf, path);
         p = buf + strlen(buf);
         *p++ = '/';
-            break;
+        while (read(fd, &de, sizeof(de)) == sizeof(de)) {
+            memmove(p, de.name, DIRSIZ);
+            p[DIRSIZ] = 0;
+            if (de.inum == 0) {
+                continue; 
+            } 
+            if (stat(buf, &st) < 0) {
+                printf("find: cannot stat\n");
+                continue;
+            }
+            if (st.type == 1) {
+                if (strcmp(de.name, "..") == 0 || strcmp(de.name, ".") == 0) {
+                    continue;
+                }
+                find(buf, filename);
+            } else if (st.type == 2) {
+                if (strcmp(de.name, filename) == 0) {
+                    printf("%s\n", buf);
+                }
+
+
+            }
+        }
+        break;
     }
+    return;
     
     
     
@@ -42,12 +65,12 @@ void find(char *path, char *filename) {
 
 int main(int argc, char* argv[]) {
     if (argc != 3) {
-        prinf("find <path> <file name>\n");
+        printf("find <path> <file name>\n");
         exit(1);
     }
-    char *path = argv[1];
-    char *filename = argv[2];
-    find(path, filename);
+    //char *path = argv[1];
+    //char *filename = argv[2];
+    find(argv[1], argv[2]);
     exit(0);
     
 
